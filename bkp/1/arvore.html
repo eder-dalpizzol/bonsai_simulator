@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Árvore 3D Procedural com Three.js</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <!-- Import map para carregar o Three.js e seus addons -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // 1. Configuração da Cena
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Cor de céu azul
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(10, 10, 10);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Controles de órbita para mover a câmera
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // 2. Luzes
+        const ambientLight = new THREE.AmbientLight(0x666666); // Luz ambiente suave
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 15, 10);
+        directionalLight.castShadow = true;
+        // Configurações de sombra
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        // 3. Chão
+        const groundGeometry = new THREE.PlaneGeometry(50, 50);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228b22 }); // Verde grama
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // 4. Materiais da Árvore
+        const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 }); // Marrom madeira
+        const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x006400 }); // Verde escuro
+
+        // 5. Gerador de Semente (PRNG)
+        // Função para gerar números pseudo-aleatórios a partir de uma semente (mulberry32)
+        function mulberry32(a) {
+            return function() {
+              var t = a += 0x6D2B79F5;
+              t = Math.imul(t ^ t >>> 15, t | 1);
+              t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+              return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+
+        // Pega a semente da URL ou gera uma nova
+        const urlParams = new URLSearchParams(window.location.search);
+        let seed = parseInt(urlParams.get('seed'));
+        if (isNaN(seed)) {
+            seed = Math.floor(Math.random() * 100000);
+            // Atualiza a URL para que a semente possa ser copiada
+            window.history.replaceState({}, '', `${window.location.pathname}?seed=${seed}`);
+        }
+
+        // Cria a função de aleatoriedade com a semente
+        const random = mulberry32(seed);
+
+        // Exibe a semente na tela
+        const seedDisplay = document.createElement('div');
+        seedDisplay.style.position = 'absolute';
+        seedDisplay.style.top = '10px';
+        seedDisplay.style.left = '10px';
+        seedDisplay.style.color = 'black';
+        seedDisplay.style.fontFamily = 'monospace';
+        seedDisplay.style.fontSize = '16px';
+        seedDisplay.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+        seedDisplay.style.padding = '5px';
+        seedDisplay.innerHTML = `Seed: ${seed} | <a href="${window.location.pathname}">Nova Árvore</a>`;
+        document.body.appendChild(seedDisplay);
+
+
+        // 6. Algoritmo Recursivo da Árvore
+        const MAX_LEVELS = 5;
+
+        function createBranch(parent, level) {
+            if (level > MAX_LEVELS) {
+                return;
+            }
+
+            // Diminui o tamanho do galho a cada nível
+            const length = 4 - level * 0.6;
+            const radius = 0.2 - level * 0.035;
+
+            const branchGeometry = new THREE.CylinderGeometry(radius, radius, length);
+            const branch = new THREE.Mesh(branchGeometry, trunkMaterial);
+            branch.castShadow = true;
+            
+            branch.position.y = length / 2; 
+            parent.add(branch);
+
+            // Se for um dos últimos níveis, adiciona "folhas"
+            if (level >= MAX_LEVELS - 2) {
+                const leavesGeometry = new THREE.IcosahedronGeometry(1.5 - level * 0.2);
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.castShadow = true;
+                leaves.position.y = length / 2;
+                branch.add(leaves);
+            }
+
+            // Cria novos galhos a partir do topo deste
+            const numBranches = Math.floor(random() * 3) + 2; // De 2 a 4 novos galhos
+            for (let i = 0; i < numBranches; i++) {
+                const pivot = new THREE.Object3D();
+                pivot.position.y = length / 2;
+                
+                // Rotaciona aleatoriamente usando a semente
+                pivot.rotation.x = (random() - 0.5) * Math.PI * 0.8;
+                pivot.rotation.z = (random() - 0.5) * Math.PI * 0.8;
+                
+                branch.add(pivot);
+                createBranch(pivot, level + 1);
+            }
+        }
+
+        // Cria a árvore inicial
+        const tree = new THREE.Object3D();
+        tree.position.y = 0;
+        scene.add(tree);
+        createBranch(tree, 0); // Inicia a recursão
+
+        // 7. Loop de Animação
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 8. Responsividade da Janela
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+/* Estilo geral do corpo */
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: #111;
+}
+
+/* O canvas deve preencher a tela inteira */
+#c {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Painel de controles */
+#controls {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background-color: rgba(34, 34, 34, 0.85);
+    padding: 15px 20px;
+    border-radius: 10px;
+    color: #f0f0f0;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+#controls h3 {
+    margin: 0 0 15px 0;
+    text-align: center;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 10px;
+}
+
+.input-group {
+    margin-bottom: 15px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #555;
+    background-color: #333;
+    color: #f0f0f0;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#controls button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    background-color: #007bff;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#controls button:hover {
+    background-color: #0056b3;
+}
+
+#controls #randomBtn {
+    background-color: #28a745;
+}
+
+#controls #randomBtn:hover {
+    background-color: #218838;
+}
+
+#controls #copyLinkBtn {
+    background-color: #17a2b8;
+}
+
+#controls #copyLinkBtn:hover {
+    background-color: #138496;
+}
+
+#controls #saveBtn {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+#controls #saveBtn:hover {
+    background-color: #e0a800;
+}
+
+/* Estilo para a label que se parece com um botão */
+.btn-like {
+    display: block; /* Para que o padding e text-align funcionem bem */
+    padding: 10px 15px;
+    border-radius: 5px;
+    background-color: #6c757d;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.2s ease;
+}
+
+.btn-like:hover {
+    background-color: #5a6268;
+}

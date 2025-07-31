@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Árvore 3D com Seed</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- O canvas onde a cena 3D será renderizada -->
+    <canvas id="c"></canvas>
+
+    <!-- Painel de Controles da Interface -->
+    <div id="controls">
+        <h3>Controles</h3>
+        <div class="input-group">
+            <label for="seedInput">Seed:</label>
+            <input type="number" id="seedInput" value="12345">
+        </div>
+        <div class="button-group">
+            <button id="generateBtn">Gerar com Seed</button>
+            <button id="randomBtn">Gerar Nova Árvore</button>
+            <button id="copyLinkBtn">Copiar Link</button>
+            <button id="saveBtn">Salvar em Arquivo</button>
+            <!-- O input de arquivo está escondido; a label age como o botão -->
+            <label for="loadInput" class="btn-like">Carregar de Arquivo</label>
+            <input type="file" id="loadInput" accept=".json,application/json" style="display: none;">
+        </div>
+    </div>
+
+    <!-- Import map para o Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+    <!-- Nosso script principal -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
