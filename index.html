@@ -7,24 +7,43 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- O canvas onde a cena 3D será renderizada -->
-    <canvas id="c"></canvas>
+    <!-- O Canvas único e compartilhado para ambas as cenas -->
+    <canvas id="main-canvas"></canvas>
 
-    <!-- Painel de Controles da Interface -->
-    <div id="controls">
-        <h3>Controles</h3>
+    <!-- Painel de Controles da Árvore -->
+    <div id="tree-controls" class="controls-panel">
+        <h3>Controles da Árvore</h3>
         <div class="input-group">
             <label for="seedInput">Seed:</label>
-            <input type="number" id="seedInput" value="12345">
+            <input type="number" id="seedInput">
         </div>
         <div class="button-group">
             <button id="generateBtn">Gerar com Seed</button>
             <button id="randomBtn">Gerar Nova Árvore</button>
             <button id="copyLinkBtn">Copiar Link</button>
             <button id="saveBtn">Salvar em Arquivo</button>
-            <!-- O input de arquivo está escondido; a label age como o botão -->
             <label for="loadInput" class="btn-like">Carregar de Arquivo</label>
             <input type="file" id="loadInput" accept=".json,application/json" style="display: none;">
+            <button id="debugModeBtn">Inspecionar Modelo</button>
+        </div>
+    </div>
+
+    <!-- Painel de Depuração do Modelo (escondido por padrão) -->
+    <div id="debug-controls" class="controls-panel hidden">
+        <h3>Depuração de Modelo 3D</h3>
+        <div class="button-group">
+            <label for="modelInput" class="btn-like">Carregar Modelo (.glb)</label>
+            <input type="file" id="modelInput" accept=".glb,.gltf" style="display: none;">
+        </div>
+        <div id="debug-info">
+            <strong>Arquivo:</strong> <span id="info-filename">Nenhum</span><br>
+            <strong>Dimensões Originais:</strong> <span id="info-dims">N/A</span><br>
+            <strong>Fator de Escala:</strong> <span id="info-scale">N/A</span><br>
+            <strong>Posição Final do Pivô:</strong> <span id="info-pivot">N/A</span>
+        </div>
+        <div class="button-group">
+            <button id="useModelBtn" disabled>Usar este Modelo na Árvore</button>
+            <button id="treeModeBtn">Voltar para a Árvore</button>
         </div>
     </div>
 
@@ -37,7 +56,6 @@
             }
         }
     </script>
-    <!-- Nosso script principal -->
     <script type="module" src="script.js"></script>
 </body>
 </html>

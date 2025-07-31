@@ -1,137 +1,221 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// --- VARIÁVEIS GLOBAIS DE ESTADO ---
-let scene, camera, renderer, controls;
-let raycaster, mouse, highlightedObject;
+// --- VARIÁVEIS GLOBAIS ---
+let renderer, raycaster, mouse;
+let treeScene, debugScene;
+let treeCamera, debugCamera;
+let treeControls, debugControls;
+let activeControls;
 
-// Estado da Árvore
-let treeData = null; // A "planta" da árvore, baseada na semente.
-let currentSeed = 0;
-let prunedIds = new Set();
+let treeData = null, currentSeed = 0, prunedIds = new Set();
+let branchTemplate = null, loadedFileInfo = {};
+let highlightedObject = null;
+let activeSceneKey = 'tree';
 
 // --- ELEMENTOS DA UI ---
-const canvas = document.getElementById('c');
-const seedInput = document.getElementById('seedInput');
-const generateBtn = document.getElementById('generateBtn');
-const randomBtn = document.getElementById('randomBtn');
-const copyLinkBtn = document.getElementById('copyLinkBtn');
-const saveBtn = document.getElementById('saveBtn');
-const loadInput = document.getElementById('loadInput');
+const ui = {
+    treeControlsPanel: document.getElementById('tree-controls'),
+    debugControlsPanel: document.getElementById('debug-controls'),
+    seedInput: document.getElementById('seedInput'),
+    generateBtn: document.getElementById('generateBtn'),
+    randomBtn: document.getElementById('randomBtn'),
+    copyLinkBtn: document.getElementById('copyLinkBtn'),
+    saveBtn: document.getElementById('saveBtn'),
+    loadInput: document.getElementById('loadInput'),
+    debugModeBtn: document.getElementById('debugModeBtn'),
+    treeModeBtn: document.getElementById('treeModeBtn'),
+    modelInput: document.getElementById('modelInput'),
+    useModelBtn: document.getElementById('useModelBtn'),
+    infoFilename: document.getElementById('info-filename'),
+    infoDims: document.getElementById('info-dims'),
+    infoScale: document.getElementById('info-scale'),
+    infoPivot: document.getElementById('info-pivot'),
+};
 
 // --- INICIALIZAÇÃO ---
 function init() {
-    setupScene();
+    const canvas = document.getElementById('main-canvas');
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.shadowMap.enabled = true;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    animate();
+
+    setupTreeScene();
+    setupDebugScene();
     setupEventListeners();
+
+    switchMode('tree'); // Inicia no modo árvore
     loadStateFromURL();
+    animate();
 }
 
-function setupScene() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(15, 15, 15);
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
+function setupTreeScene() {
+    treeScene = new THREE.Scene();
+    treeScene.background = new THREE.Color(0x87ceeb);
+    treeCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    treeCamera.position.set(15, 15, 15);
+    treeControls = new OrbitControls(treeCamera, renderer.domElement);
+    treeControls.enableDamping = true;
+
     const ambientLight = new THREE.AmbientLight(0x666666);
-    scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 15, 10);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    scene.add(directionalLight);
-    const groundGeometry = new THREE.PlaneGeometry(50, 50);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228b22 });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), new THREE.MeshLambertMaterial({ color: 0x228b22 }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
-    scene.add(ground);
+    treeScene.add(ambientLight, directionalLight, ground);
+}
+
+function setupDebugScene() {
+    debugScene = new THREE.Scene();
+    debugScene.background = new THREE.Color(0x333333);
+    debugCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    debugCamera.position.set(1, 1, 1);
+    debugControls = new OrbitControls(debugCamera, renderer.domElement);
+    debugControls.enableDamping = true;
+
+    const ambientLight = new THREE.AmbientLight(0xaaaaaa);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 2, 1);
+    const gridHelper = new THREE.GridHelper(2, 10);
+    const axesHelper = new THREE.AxesHelper(1);
+    debugScene.add(ambientLight, directionalLight, gridHelper, axesHelper);
 }
 
 function setupEventListeners() {
     window.addEventListener('resize', onWindowResize);
-    generateBtn.addEventListener('click', () => generateNewTree(parseInt(seedInput.value)));
-    randomBtn.addEventListener('click', () => generateNewTree(Math.floor(Math.random() * 100000)));
-    copyLinkBtn.addEventListener('click', copyTreeLink);
-    saveBtn.addEventListener('click', saveTreeToFile);
-    loadInput.addEventListener('change', loadTreeFromFile);
+    ui.generateBtn.addEventListener('click', () => generateNewTree(parseInt(ui.seedInput.value)));
+    ui.randomBtn.addEventListener('click', () => generateNewTree(Math.floor(Math.random() * 100000)));
+    ui.copyLinkBtn.addEventListener('click', copyTreeLink);
+    ui.saveBtn.addEventListener('click', saveTreeToFile);
+    ui.loadInput.addEventListener('change', loadTreeFromFile);
+    ui.debugModeBtn.addEventListener('click', () => switchMode('debug'));
+    ui.treeModeBtn.addEventListener('click', () => switchMode('tree'));
+    ui.modelInput.addEventListener('change', handleModelUpload);
+    ui.useModelBtn.addEventListener('click', () => {
+        branchTemplate = debugScene.getObjectByName("loadedModel");
+        alert('Template do modelo atualizado!');
+        switchMode('tree');
+    });
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mousedown', onMouseDown);
 }
 
-// --- LÓGICA DE GERAÇÃO (DADOS -> VISUALIZAÇÃO) ---
+// --- LÓGICA DE MODO ---
+function switchMode(mode) {
+    activeSceneKey = mode;
+    if (mode === 'tree') {
+        ui.treeControlsPanel.classList.remove('hidden');
+        ui.debugControlsPanel.classList.add('hidden');
+        treeControls.enabled = true;
+        debugControls.enabled = false;
+        activeControls = treeControls;
+    } else {
+        ui.treeControlsPanel.classList.add('hidden');
+        ui.debugControlsPanel.classList.remove('hidden');
+        treeControls.enabled = false;
+        debugControls.enabled = true;
+        activeControls = debugControls;
+    }
+}
 
-// Gera uma nova "planta" e a visualização
+// --- LÓGICA DE DEPURAÇÃO ---
+async function handleModelUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    try {
+        const { model, info } = await loadAndNormalizeModel(url);
+        loadedFileInfo = { ...info, filename: file.name };
+        updateDebugInfo();
+        const existingModel = debugScene.getObjectByName("loadedModel");
+        if (existingModel) debugScene.remove(existingModel);
+        model.name = "loadedModel";
+        debugScene.add(model);
+        ui.useModelBtn.disabled = false;
+    } catch (error) { alert("Erro: " + error.message); }
+    URL.revokeObjectURL(url);
+    event.target.value = '';
+}
+
+function loadAndNormalizeModel(url) {
+    const loader = new GLTFLoader();
+    return new Promise((resolve, reject) => {
+        loader.load(url, (gltf) => {
+            let model = null;
+            gltf.scene.traverse(child => { if (child.isMesh) model = child; });
+            if (!model) return reject(new Error("Nenhuma malha (Mesh) encontrada."));
+
+            const originalBox = new THREE.Box3().setFromObject(model);
+            const originalSize = originalBox.getSize(new THREE.Vector3());
+            if (originalSize.y === 0) return reject(new Error("Altura do modelo é 0."));
+
+            const scaleFactor = 1.0 / originalSize.y;
+            model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            const scaledBox = new THREE.Box3().setFromObject(model);
+            model.position.y = -scaledBox.min.y;
+            model.material = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+
+            const info = {
+                originalDims: `(${originalSize.x.toFixed(2)}, ${originalSize.y.toFixed(2)}, ${originalSize.z.toFixed(2)})`,
+                scaleFactor: scaleFactor.toFixed(4),
+                finalPivot: `(${model.position.x.toFixed(2)}, ${model.position.y.toFixed(2)}, ${model.position.z.toFixed(2)})`
+            };
+            resolve({ model, info });
+        }, undefined, () => reject(new Error("Falha ao carregar arquivo GLB.")));
+    });
+}
+
+function updateDebugInfo() {
+    ui.infoFilename.textContent = loadedFileInfo.filename || 'Nenhum';
+    ui.infoDims.textContent = loadedFileInfo.originalDims || 'N/A';
+    ui.infoScale.textContent = loadedFileInfo.scaleFactor || 'N/A';
+    ui.infoPivot.textContent = loadedFileInfo.finalPivot || 'N/A';
+}
+
+// --- LÓGICA DE GERAÇÃO DA ÁRVORE ---
 function generateNewTree(seed, initialPrunedIds = new Set()) {
     if (isNaN(seed)) return;
     currentSeed = seed;
     prunedIds = initialPrunedIds;
-    seedInput.value = currentSeed;
-
-    // FASE 1: Gerar a estrutura de dados (a "planta")
+    ui.seedInput.value = currentSeed;
     const random = new Mulberry32(currentSeed);
     let idCounter = 0;
     treeData = generateBranchData(null, 0, random, () => idCounter++);
-
-    // FASE 2: Construir a visualização a partir dos dados
     buildTreeView();
 }
 
-// Apenas reconstrói a visualização a partir dos dados existentes
 function buildTreeView() {
-    const existingTree = scene.getObjectByName("tree");
-    if (existingTree) {
-        disposeOfObject(existingTree);
-    }
-
+    const existingTree = treeScene.getObjectByName("tree");
+    if (existingTree) disposeOfObject(existingTree);
     const treeObject = new THREE.Object3D();
     treeObject.name = "tree";
     buildMeshFromData(treeObject, treeData, prunedIds);
-    scene.add(treeObject);
+    treeScene.add(treeObject);
     updateURL();
 }
 
-// --- FASE 1: GERAR A "PLANTA" DA ÁRVORE ---
-
 function generateBranchData(parentData, level, random, getId) {
     if (level > 5) return null;
-
     const branchData = { id: getId(), level, children: [] };
-
-    const numSegments = 3;
-    branchData.segments = [];
-    for (let i = 0; i < numSegments; i++) {
-        branchData.segments.push({ id: getId(), level, segmentIndex: i });
-    }
-
-    if (level >= 3) {
-        branchData.leaf = { id: getId() };
-    }
-
+    branchData.segments = Array.from({ length: 3 }, (_, i) => ({ id: getId(), level, segmentIndex: i }));
+    if (level >= 3) branchData.leaf = { id: getId() };
     const numBranches = Math.floor(random.next() * 3) + 2;
     for (let i = 0; i < numBranches; i++) {
         const childData = generateBranchData(branchData, level + 1, random, getId);
         if (childData) {
-            childData.rotation = {
-                x: (random.next() - 0.5) * Math.PI * 0.8,
-                z: (random.next() - 0.5) * Math.PI * 0.8
-            };
+            childData.rotation = { x: (random.next() - 0.5) * Math.PI * 0.8, z: (random.next() - 0.5) * Math.PI * 0.8 };
             branchData.children.push(childData);
         }
     }
     return branchData;
 }
 
-// --- FASE 2: CONSTRUIR O MODELO 3D A PARTIR DOS DADOS ---
-
-const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
 const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x006400 });
 
 function buildMeshFromData(parent, data, idsToSkip) {
@@ -142,33 +226,49 @@ function buildMeshFromData(parent, data, idsToSkip) {
     const segmentLength = totalLength / 3;
 
     let currentParent = parent;
+    let topPosition; // Variável para armazenar a posição do topo do último segmento
+
     for (const segmentData of data.segments) {
         if (idsToSkip.has(segmentData.id)) continue;
-        const segment = new THREE.Mesh(
-            new THREE.CylinderGeometry(radius, radius, segmentLength),
-            trunkMaterial.clone()
-        );
+
+        let segment;
+        if (branchTemplate) {
+            // Lógica para o modelo 3D com pivô na base
+            segment = branchTemplate.clone();
+            segment.material = branchTemplate.material.clone();
+            segment.scale.set(radius * 2, segmentLength, radius * 2);
+            segment.position.y = (segmentData.segmentIndex === 0) ? 0 : segmentLength;
+            topPosition = segmentLength; // O topo de um modelo com base na origem é sua altura total
+        } else {
+            // Lógica para o cilindro padrão com pivô no centro
+            segment = new THREE.Mesh(
+                new THREE.CylinderGeometry(radius, radius, segmentLength),
+                new THREE.MeshLambertMaterial({ color: 0x8b4513 })
+            );
+            segment.position.y = (segmentData.segmentIndex === 0) ? segmentLength / 2 : segmentLength;
+            topPosition = segmentLength / 2; // O topo de um cilindro com pivô no centro é metade de sua altura
+        }
+
         segment.castShadow = true;
-        segment.position.y = (segmentData.segmentIndex === 0) ? segmentLength / 2 : segmentLength;
         segment.userData = segmentData;
         currentParent.add(segment);
         currentParent = segment;
     }
 
+    // Se todos os segmentos foram pulados, não continue.
+    if (currentParent === parent) return;
+
     if (data.leaf && !idsToSkip.has(data.leaf.id)) {
-        const leaves = new THREE.Mesh(
-            new THREE.IcosahedronGeometry(1.5 - data.level * 0.2),
-            leavesMaterial.clone()
-        );
+        const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 - data.level * 0.2), leavesMaterial.clone());
         leaves.castShadow = true;
-        leaves.position.y = segmentLength / 2;
+        leaves.position.y = topPosition;
         leaves.userData = { id: data.leaf.id };
         currentParent.add(leaves);
     }
 
     for (const childData of data.children) {
         const pivot = new THREE.Object3D();
-        pivot.position.y = segmentLength / 2;
+        pivot.position.y = topPosition;
         pivot.rotation.x = childData.rotation.x;
         pivot.rotation.z = childData.rotation.z;
         currentParent.add(pivot);
@@ -177,37 +277,19 @@ function buildMeshFromData(parent, data, idsToSkip) {
 }
 
 // --- LÓGICA DE INTERAÇÃO E ESTADO ---
-
 function onMouseDown(event) {
-    if (event.button !== 0 || event.target !== canvas) return;
-
+    if (activeSceneKey !== 'tree' || event.button !== 0) return;
     if (highlightedObject) {
         const id = highlightedObject.userData.id;
-        const type = highlightedObject.geometry.type;
-
-        // CASO 1: Clicou em uma folha. Remove apenas a folha.
-        if (type === 'IcosahedronGeometry') {
+        const isLeaf = highlightedObject.geometry.type === 'IcosahedronGeometry';
+        if (isLeaf) {
             prunedIds.add(id);
-            buildTreeView();
-            highlightedObject = null;
-            return; // Fim da operação
-        }
-
-        // CASO 2: Clicou em um galho. Remove o galho inteiro.
-        if (type === 'CylinderGeometry') {
+        } else {
             const { branch } = findNodeById(treeData, id);
-
-            if (branch) {
-                // Regra para não podar o tronco principal
-                if (branch.level === 0) {
-                    console.log("Não é possível podar o tronco principal.");
-                    return;
-                }
-                addBranchIdsToPruneSet(branch);
-                buildTreeView();
-                highlightedObject = null;
-            }
+            if (branch && branch.level > 0) addBranchIdsToPruneSet(branch);
         }
+        buildTreeView();
+        highlightedObject = null;
     }
 }
 
@@ -244,9 +326,7 @@ function loadStateFromURL() {
     if (state) {
         const parts = state.split('_p');
         seed = parseInt(parts[0]);
-        if (parts[1] && parts[1].length) {
-            ids = parts[1].split(',').map(Number);
-        }
+        if (parts[1] && parts[1].length) ids = parts[1].split(',').map(Number);
     }
     generateNewTree(seed, new Set(ids));
 }
@@ -289,7 +369,7 @@ function loadTreeFromFile(event) {
     event.target.value = '';
 }
 
-// --- FUNÇÕES AUXILIARES E LOOP DE ANIMAÇÃO ---
+// --- LOOP DE ANIMAÇÃO E FUNÇÕES AUXILIARES ---
 
 function onMouseMove(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -297,10 +377,10 @@ function onMouseMove(event) {
 }
 
 function checkHighlight() {
-    raycaster.setFromCamera(mouse, camera);
-    const treeObject = scene.getObjectByName("tree");
+    if (activeSceneKey !== 'tree') return;
+    raycaster.setFromCamera(mouse, treeCamera);
+    const treeObject = treeScene.getObjectByName("tree");
     if (!treeObject) return;
-
     const intersects = raycaster.intersectObjects(treeObject.children, true);
     if (highlightedObject) {
         highlightedObject.material.emissive.setHex(0x000000);
@@ -315,20 +395,28 @@ function checkHighlight() {
 
 function disposeOfObject(obj) {
     obj.traverse(child => { if (child.isMesh) { child.geometry.dispose(); child.material.dispose(); } });
-    obj.parent.remove(obj);
+    if(obj.parent) obj.parent.remove(obj);
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    treeCamera.aspect = width / height;
+    treeCamera.updateProjectionMatrix();
+    debugCamera.aspect = width / height;
+    debugCamera.updateProjectionMatrix();
+    renderer.setSize(width, height);
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
-    checkHighlight();
-    renderer.render(scene, camera);
+    activeControls.update();
+    if (activeSceneKey === 'tree') {
+        checkHighlight();
+        renderer.render(treeScene, treeCamera);
+    } else {
+        renderer.render(debugScene, debugCamera);
+    }
 }
 
 function Mulberry32(seed) {
