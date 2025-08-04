@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Skin Simples</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info { position: absolute; top: 10px; left: 10px; color: #fff; font-family: sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="info">Duplo‐clique para criar e ligar dois pontos</div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.163/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.163/examples/jsm/controls/OrbitControls.js';
+    import * as BufferGeometryUtils from 'https://cdn.jsdelivr.net/npm/three@0.163/examples/jsm/utils/BufferGeometryUtils.js';
+
+    const scene    = new THREE.Scene();
+    scene.background = new THREE.Color(0x202025);
+
+    const camera   = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 100);
+    camera.position.set(0, 4, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // Luzes
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 1.2));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(5, 10, 7);
+    scene.add(dir);
+
+    // Plano
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(20,20).rotateX(-Math.PI/2),
+      new THREE.MeshStandardMaterial({ color: 0x303035, side: THREE.DoubleSide })
+    );
+    scene.add(plane);
+
+    const raycaster = new THREE.Raycaster();
+    const mouse     = new THREE.Vector2();
+    const pontos    = [];
+
+    window.addEventListener('dblclick', ev => {
+      mouse.set((ev.clientX/innerWidth)*2 - 1, -(ev.clientY/innerHeight)*2 + 1);
+      raycaster.setFromCamera(mouse, camera);
+      const hit = raycaster.intersectObject(plane)[0];
+      if (!hit) return;
+
+      const esfera = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2,16,16),
+        new THREE.MeshStandardMaterial({ color: 0x44aaff })
+      );
+      esfera.position.copy(hit.point);
+      scene.add(esfera);
+      pontos.push(esfera);
+
+      if (pontos.length === 2) {
+        scene.add(buildSkin(pontos[0].position, pontos[1].position, 0.2, 0.2));
+        pontos.length = 0;
+      }
+    });
+
+    function buildSkin(pa, pb, r1, r2) {
+      const s1 = new THREE.SphereGeometry(r1,16,16).translate(pa.x,pa.y,pa.z);
+      const s2 = new THREE.SphereGeometry(r2,16,16).translate(pb.x,pb.y,pb.z);
+
+      const dirVec = new THREE.Vector3().subVectors(pb, pa);
+      const len = dirVec.length();
+      const cyl = new THREE.CylinderGeometry(r1, r2, len, 8)
+        .translate(0, len/2, 0)
+        .applyMatrix4(new THREE.Matrix4().lookAt(pa, pb, new THREE.Vector3(0,1,0)).invert())
+        .translate(pa.x, pa.y, pa.z);
+
+      const geom = BufferGeometryUtils.mergeGeometries([s1, s2, cyl], true);
+      geom.computeVertexNormals();
+
+      return new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0xff8844 }));
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    (function animate(){
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    })();
+  </script>
+</body>
+</html>

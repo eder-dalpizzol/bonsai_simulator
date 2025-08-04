@@ -7,8 +7,10 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- O Canvas único e compartilhado para ambas as cenas -->
-    <canvas id="main-canvas"></canvas>
+    <!-- Container para a visualização 3D -->
+    <div id="canvas-container">
+        <canvas id="main-canvas"></canvas>
+    </div>
 
     <!-- Painel de Controles da Árvore -->
     <div id="tree-controls" class="controls-panel">
@@ -25,6 +27,10 @@
             <label for="loadInput" class="btn-like">Carregar de Arquivo</label>
             <input type="file" id="loadInput" accept=".json,application/json" style="display: none;">
             <button id="debugModeBtn">Inspecionar Modelo</button>
+        </div>
+        <div class="input-group-checkbox">
+            <input type="checkbox" id="debugPointsCheck">
+            <label for="debugPointsCheck">Modo de Debug (Linhas)</label>
         </div>
     </div>
 
